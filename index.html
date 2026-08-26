@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cafe Menu</title>
+  <meta name="description" content="Our menu — fresh, simple, made with care." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <img
+      src="logo.png"
+      alt="Cafe logo"
+      class="site-logo"
+      id="site-logo"
+      onerror="this.replaceWith(Object.assign(document.createElement('div'), {className:'site-logo-fallback', textContent:'Your Cafe'}))"
+    />
+    <p class="site-tagline">Menu</p>
+  </header>
+
+  <div class="category-nav-wrap">
+    <nav class="category-nav" id="category-nav" role="tablist" aria-label="Menu categories">
+      <!-- Category pills injected by app.js -->
+    </nav>
+  </div>
+
+  <main class="menu-main" id="menu-main">
+    <!-- Menu sections injected by app.js -->
+  </main>
+
+  <footer class="site-footer">
+    <p>Prices include VAT where applicable. Please tell us about any allergies.</p>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

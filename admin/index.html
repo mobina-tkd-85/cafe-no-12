@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cafe Admin</title>
+  <meta name="robots" content="noindex, nofollow" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="../css/styles.css" />
+  <link rel="stylesheet" href="../css/admin.css" />
+</head>
+<body class="admin-body">
+
+  <!-- Login screen -->
+  <div class="login-wrap" id="login-wrap">
+    <div class="login-card">
+      <h2>Admin sign in</h2>
+      <p class="hint">Sign in with the admin account you created in Firebase Authentication.</p>
+      <form id="login-form">
+        <div class="field">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" required autocomplete="username" />
+        </div>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" required autocomplete="current-password" />
+        </div>
+        <p class="error-text" id="login-error"></p>
+        <button type="submit" class="btn" style="width:100%;">Sign in</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" hidden>
+    <div class="admin-topbar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <h1>Cafe Admin</h1>
+      </div>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <span style="font-size:13px; color:var(--ink-soft);" id="admin-email-label"></span>
+        <button class="btn btn-outline" id="logout-btn">Sign out</button>
+        <a href="../index.html" class="btn btn-outline" target="_blank" rel="noopener">View site</a>
+      </div>
+    </div>
+
+    <main class="admin-main">
+
+      <!-- Categories -->
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <h2>Categories</h2>
+            <p>These appear as the horizontal icons at the top of the menu.</p>
+          </div>
+        </div>
+
+        <form id="category-form">
+          <div class="form-grid">
+            <div class="field">
+              <label for="category-name-input">Category name</label>
+              <input type="text" id="category-name-input" placeholder="e.g. Hot Drinks" required />
+            </div>
+            <div class="field">
+              <label for="category-logo-input">Category icon (optional)</label>
+              <input type="file" id="category-logo-input" accept="image/png,image/jpeg,image/webp,image/gif" />
+              <img class="image-preview" id="category-logo-preview" hidden alt="" />
+            </div>
+          </div>
+          <div class="progress-bar" id="category-upload-progress" style="display:none;">
+            <div class="progress-bar-fill"></div>
+          </div>
+          <p class="error-text" id="category-form-error"></p>
+          <button type="submit" class="btn" id="category-submit-btn">Add category</button>
+        </form>
+
+        <hr style="border:none; border-top:1px solid var(--forest-line); margin:22px 0;" />
+
+        <div class="admin-list" id="category-list"></div>
+      </section>
+
+      <!-- Items -->
+      <section class="admin-section">
+        <div class="admin-section-head">
+          <div>
+            <h2>Menu items</h2>
+            <p>Add items and assign each one to a category.</p>
+          </div>
+        </div>
+
+        <form id="item-form">
+          <div class="form-grid">
+            <div class="field">
+              <label for="item-name-input">Item name</label>
+              <input type="text" id="item-name-input" placeholder="e.g. Flat White" required />
+            </div>
+            <div class="field">
+              <label for="item-price-input">Price (£)</label>
+              <input type="number" id="item-price-input" min="0" step="0.01" placeholder="3.50" required />
+            </div>
+            <div class="field">
+              <label for="item-category-select">Category</label>
+              <select id="item-category-select" required></select>
+            </div>
+            <div class="field">
+              <label for="item-image-input">Item photo (optional)</label>
+              <input type="file" id="item-image-input" accept="image/png,image/jpeg,image/webp,image/gif" />
+              <img class="image-preview" id="item-image-preview" hidden alt="" />
+            </div>
+            <div class="field full">
+              <label for="item-description-input">Description (optional)</label>
+              <textarea id="item-description-input" placeholder="Short description shown under the item name"></textarea>
+            </div>
+          </div>
+          <div class="progress-bar" id="item-upload-progress" style="display:none;">
+            <div class="progress-bar-fill"></div>
+          </div>
+          <p class="error-text" id="item-form-error"></p>
+          <button type="submit" class="btn" id="item-submit-btn">Add item</button>
+        </form>
+
+        <hr style="border:none; border-top:1px solid var(--forest-line); margin:22px 0;" />
+
+        <div class="admin-list" id="item-list"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+[build]
+  publish = "."
+  command = "echo 'No build step needed — static site.'"
+
+# Cache-bust: HTML is never cached, so a redeploy is always picked up.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
