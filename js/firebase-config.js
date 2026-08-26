@@ -1,21 +1,17 @@
-// ---------------------------------------------------------------------------
-// Firebase configuration
-//
-// Paste the values from Firebase Console → Project settings → General →
-// "Your apps" → SDK setup and configuration → Config.
-//
-// NOTE: This config is safe to keep in your public repo. Firebase web app
-// config identifies your project, it is not a secret. Your data is protected
-// by the Firestore/Storage *security rules* (see firestore.rules and
-// storage.rules), not by hiding these values. Full explanation:
-// https://firebase.google.com/docs/projects/api-keys
-// ---------------------------------------------------------------------------
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-export const firebaseConfig = {
-  apiKey: "PASTE_YOUR_API_KEY",
-  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
-  projectId: "PASTE_YOUR_PROJECT_ID",
-  storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
-  messagingSenderId: "PASTE_YOUR_SENDER_ID",
-  appId: "PASTE_YOUR_APP_ID",
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyB_RANVlz_RNRR54vovPHlCnsbflC8tEws",
+  authDomain: "cafe-no-12.firebaseapp.com",
+  projectId: "cafe-no-12",
+  storageBucket: "cafe-no-12.firebasestorage.app",
+  messagingSenderId: "644612037779",
+  appId: "1:644612037779:web:76f1c5e0b18e8611234166"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
