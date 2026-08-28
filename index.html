@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cafe Menu</title>
-  <meta name="description" content="Our menu — fresh, simple, made with care." />
+  <title>Café Menu</title>
+  <meta name="description" content="Thoughtfully crafted dishes and beverages — made fresh, served with care." />
+  <meta name="theme-color" content="#2C4A2E" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600;700&display=swap"
     rel="stylesheet"
   />
 
@@ -19,10 +20,11 @@
   <header class="site-header">
     <img
       src="logo.png"
-      alt="Cafe logo"
+      alt="Café logo"
       class="site-logo"
       id="site-logo"
-      onerror="this.replaceWith(Object.assign(document.createElement('div'), {className:'site-logo-fallback', textContent:'Your Cafe'}))"
+      loading="lazy"
+      onerror="this.replaceWith(Object.assign(document.createElement('div'), {className:'site-logo-fallback', textContent:'Café'}))"
     />
     <p class="site-tagline">Menu</p>
   </header>
@@ -38,10 +40,10 @@
   </main>
 
   <footer class="site-footer">
-    <p>Prices include VAT where applicable. Please tell us about any allergies.</p>
+    <p>Prices include applicable VAT. Please inform our team of any dietary requirements or allergies.</p>
   </footer>
 
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast" role="alert" aria-live="polite"></div>
 
   <script type="module" src="js/app.js"></script>
 </body>
