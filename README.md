@@ -6,8 +6,9 @@ categories and items. Plain HTML/CSS/JavaScript — no build step, no framework.
 - **Public site**: `index.html` — logo, horizontal category nav, vertical menu.
 - **Admin panel**: `admin/index.html` (served at `/admin` once deployed) —
   add/delete categories and items, upload images.
-- **Backend**: Firebase (Firestore for data, Storage for images, Authentication
-  for the admin login).
+- **Backend**: [Supabase](https://supabase.com) — Postgres database for menu
+  data, Storage for images, Auth for the admin login. Free tier, no credit
+  card required.
 - **Hosting**: Netlify, deployed automatically from a GitHub repo.
 
 ---
@@ -20,42 +21,55 @@ nothing breaks — but add the real file before you launch.
 
 ---
 
-## 2. Set up Firebase
+## 2. Set up Supabase
 
 ### 2.1 Create the project
-1. Go to [console.firebase.google.com](https://console.firebase.google.com) → **Add project**.
-2. Name it (e.g. `my-cafe-menu`) and finish the wizard (Google Analytics is optional, you can skip it).
+1. Go to [supabase.com](https://supabase.com) → **Start your project** → sign
+   up (GitHub sign-in is fastest) — no card needed.
+2. Click **New project**. Pick an organisation, name it (e.g. `cafe-menu`),
+   set a database password (save it somewhere, you likely won't need it again),
+   choose a region close to your customers, and create it. It takes a minute
+   or two to provision.
 
-### 2.2 Register a web app
-1. In the project, click the **`</>`** (web) icon to add a web app.
-2. Give it a nickname (e.g. "Cafe Menu Web"). You don't need Firebase Hosting.
-3. Copy the `firebaseConfig` object shown on screen.
-4. Paste those values into `js/firebase-config.js` in this project, replacing the placeholders.
+### 2.2 Create the database tables and policies
+1. In the left sidebar, open **SQL Editor** → **New query**.
+2. Open `schema.sql` from this project, copy its entire contents, paste it
+   into the query editor, and click **Run**.
+3. This creates the `categories` and `items` tables, turns on Row Level
+   Security (public read, admin-only write), and sets up matching Storage
+   policies.
 
-   This config is safe to commit to a public GitHub repo — it identifies your
-   project but isn't a secret. Your data is protected by the security rules
-   below, not by hiding this file.
+### 2.3 Create the Storage buckets
+1. In the sidebar, open **Storage** → **New bucket**.
+2. Create a bucket named exactly `category-logos`. Toggle **Public bucket**
+   on when creating it.
+3. Repeat for a second bucket named exactly `menu-items`, also **Public**.
+4. The policies from `schema.sql` already cover both buckets — you don't need
+   to add anything else here.
 
-### 2.3 Enable Firestore
-1. In the left sidebar: **Build → Firestore Database → Create database**.
-2. Choose a location close to your customers, and start in **production mode**.
-3. Once created, go to the **Rules** tab and replace the contents with the
-   contents of `firestore.rules` from this project, then **Publish**.
+### 2.4 Create your admin login
+1. In the sidebar, open **Authentication** → **Users** → **Add user** →
+   **Create new user**.
+2. Enter the email and password you (the cafe owner/admin) will use to sign
+   into `/admin`. Untick "Auto confirm user" only if you want to verify by
+   email first — for a single admin account, leaving it ticked (confirmed
+   immediately) is simplest.
+3. This should be the only account you create — there's no public sign-up
+   form in the admin panel, by design.
 
-### 2.4 Enable Storage
-1. **Build → Storage → Get started**. Use the default bucket, production mode.
-2. Go to the **Rules** tab and replace the contents with `storage.rules` from
-   this project, then **Publish**.
+### 2.5 Copy your project credentials
+1. In the sidebar, open **Project Settings** (gear icon) → **API**.
+2. Copy the **Project URL** and the **anon public** key.
+3. Paste both into `js/supabase-config.js` in this project, replacing the
+   placeholders.
 
-### 2.5 Enable Authentication (for admin login)
-1. **Build → Authentication → Get started**.
-2. Under **Sign-in method**, enable **Email/Password**.
-3. Go to the **Users** tab → **Add user**. Enter the email and password you
-   (the cafe owner/admin) will use to log into `/admin`. This is the only
-   account that should exist — there's no public sign-up, by design.
+   This key is safe to commit to a public GitHub repo — it identifies your
+   project and is designed to be used from the browser. Your data is
+   protected by the Row Level Security policies from `schema.sql`, not by
+   hiding this file.
 
-That's it for Firebase — no server code to deploy, the site talks to Firebase
-directly from the browser using the rules above to control access.
+That's it for Supabase — no server code to deploy, the site talks to Supabase
+directly from the browser using the policies above to control access.
 
 ---
 
@@ -76,15 +90,19 @@ git push -u origin main
 (Create the empty repo on GitHub first via **github.com → New repository**,
 without a README/gitignore so it doesn't conflict with this push.)
 
+If you're migrating an existing repo from an earlier Firebase version of this
+project, just commit the updated files (`git add .`, `git commit -m "Migrate
+to Supabase"`, `git push`) instead of starting a new repo.
+
 ---
 
 ## 4. Deploy on Netlify
 
 1. Go to [app.netlify.com](https://app.netlify.com) → **Add new site → Import an existing project**.
 2. Connect GitHub and pick your repository.
-3. Build settings: leave the build command blank (or `echo "no build"`) and
-   set the publish directory to `.` (the repo root) — `netlify.toml` in this
-   project already configures this for you, so the defaults should work.
+3. Build settings: leave the build command blank (or `echo "no build"`), leave
+   **Base directory** empty, and set the publish directory to `.` — `netlify.toml`
+   in this project already configures this for you, so the defaults should work.
 4. Click **Deploy**. Netlify will give you a live URL immediately.
 5. From then on, every `git push` to `main` triggers an automatic redeploy.
 
@@ -99,14 +117,14 @@ follow the DNS instructions for your domain registrar.
 ## 5. Using the admin panel
 
 1. Visit `/admin` on your live site.
-2. Sign in with the email/password you created in Firebase Authentication (step 2.5).
+2. Sign in with the email/password you created in Supabase (step 2.4).
 3. **Add a category** first (e.g. "Hot Drinks", "Breakfast", "Cakes") — optionally
    upload a small square icon image for it.
 4. **Add items**, choosing which category each belongs to, with a name, price
    in £, optional photo, and optional description.
-5. Changes save straight to Firebase and appear on the public site immediately
+5. Changes save straight to Supabase and appear on the public site immediately
    (just refresh the page — no redeploy needed, since menu content lives in
-   Firestore, not in the static files).
+   the database, not in the static files).
 
 To delete a category, its items are deleted too (you'll get a warning first).
 
@@ -116,31 +134,35 @@ To delete a category, its items are deleted too (you'll get a warning first).
 
 ```
 cafe/
-├── index.html            # Public menu page
-├── logo.png              # Your logo (add this yourself)
+├── index.html              # Public menu page
+├── logo.png                # Your logo (add this yourself)
 ├── admin/
-│   ├── index.html        # Admin panel page
-│   └── admin.js          # Admin panel logic (auth, CRUD, uploads)
+│   ├── index.html          # Admin panel page
+│   └── admin.js             # Admin panel logic (auth, CRUD, uploads)
 ├── css/
-│   ├── styles.css        # Public site styles
-│   └── admin.css         # Admin panel styles
+│   ├── styles.css           # Public site styles
+│   └── admin.css            # Admin panel styles
 ├── js/
-│   ├── app.js             # Public site logic (loads + renders menu)
-│   ├── firebase-init.js   # Shared Firebase initialization
-│   └── firebase-config.js # Your Firebase project credentials (edit this)
-├── firestore.rules        # Firestore security rules
-├── storage.rules          # Storage security rules
-├── netlify.toml           # Netlify build/deploy configuration
+│   ├── app.js                # Public site logic (loads + renders menu)
+│   ├── supabase-init.js      # Shared Supabase client initialization
+│   └── supabase-config.js    # Your Supabase project credentials (edit this)
+├── schema.sql                 # Database tables, RLS policies, Storage policies
+├── netlify.toml                # Netlify build/deploy configuration
 └── README.md
 ```
 
 ## Notes & troubleshooting
 
-- **"Missing or insufficient permissions" in the admin panel**: the Firestore
-  or Storage rules haven't been published yet, or you're not signed in.
-- **Images not showing**: check the Storage rules are published, and that the
-  uploaded file is under 5MB and an actual image type.
-- **Changing the admin password**: Firebase Console → Authentication → Users →
+- **"new row violates row-level security policy" in the admin panel**: you're
+  not signed in, or `schema.sql` hasn't been run yet — re-check step 2.2.
+- **Images not showing**: make sure both Storage buckets exist, are named
+  exactly `category-logos` and `menu-items`, and are marked **Public**.
+- **Changing the admin password**: Supabase Dashboard → Authentication → Users →
   select the user → reset password, or delete and recreate the user.
 - **Adding a second admin**: add another user under Authentication → Users;
-  the rules already allow any signed-in user to manage the menu.
+  the policies already allow any signed-in user to manage the menu.
+- **Logo/images not updating after you change them**: this is browser
+  caching, not a bug — hard refresh (Ctrl/Cmd+Shift+R) or open in a private
+  window to confirm the new file is actually live. For the site logo
+  specifically, renaming the file each time you update it (e.g. `logo-v2.png`,
+  updating the `src` in `index.html` to match) avoids this entirely.

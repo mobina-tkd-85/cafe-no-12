@@ -1,10 +1,4 @@
-import {
-  db,
-  collection,
-  getDocs,
-  query,
-  orderBy,
-} from "./firebase-init.js";
+import { supabase } from "./supabase-init.js";
 
 const categoryNav = document.getElementById("category-nav");
 const menuMain = document.getElementById("menu-main");
@@ -67,8 +61,8 @@ function renderCategoryNav() {
     btn.setAttribute("aria-selected", index === 0 ? "true" : "false");
     if (index === 0) btn.classList.add("is-active");
 
-    const imgHtml = cat.logoUrl
-      ? `<img class="category-pill-img" src="${escapeHtml(cat.logoUrl)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=\\'category-pill-img-fallback\\'>${escapeHtml(
+    const imgHtml = cat.logo_url
+      ? `<img class="category-pill-img" src="${escapeHtml(cat.logo_url)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=\\'category-pill-img-fallback\\'>${escapeHtml(
           (cat.name || "?").slice(0, 2).toUpperCase()
         )}</div>'" />`
       : `<div class="category-pill-img-fallback">${escapeHtml(
@@ -92,8 +86,8 @@ function renderCategoryNav() {
 }
 
 function itemCardHtml(item) {
-  const imgHtml = item.imageUrl
-    ? `<img class="menu-item-img" src="${escapeHtml(item.imageUrl)}" alt="" loading="lazy"
+  const imgHtml = item.image_url
+    ? `<img class="menu-item-img" src="${escapeHtml(item.image_url)}" alt="" loading="lazy"
          onerror="this.outerHTML='<div class=\\'menu-item-img-fallback\\'>No photo</div>'" />`
     : `<div class="menu-item-img-fallback">No photo</div>`;
 
@@ -182,17 +176,22 @@ function setupScrollSpy() {
 async function loadMenu() {
   renderSkeleton();
   try {
-    const categoriesQuery = query(collection(db, "categories"), orderBy("order", "asc"));
-    const categoriesSnap = await getDocs(categoriesQuery);
-    state.categories = categoriesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const { data: categories, error: categoriesError } = await supabase
+      .from("categories")
+      .select("*")
+      .order("order", { ascending: true });
 
-    const itemsSnap = await getDocs(collection(db, "items"));
+    if (categoriesError) throw categoriesError;
+    state.categories = categories || [];
+
+    const { data: items, error: itemsError } = await supabase.from("items").select("*");
+    if (itemsError) throw itemsError;
+
     state.itemsByCategory = new Map();
-    itemsSnap.docs.forEach((d) => {
-      const item = { id: d.id, ...d.data() };
-      const list = state.itemsByCategory.get(item.categoryId) || [];
+    (items || []).forEach((item) => {
+      const list = state.itemsByCategory.get(item.category_id) || [];
       list.push(item);
-      state.itemsByCategory.set(item.categoryId, list);
+      state.itemsByCategory.set(item.category_id, list);
     });
     // Keep items in a stable, readable order within each category
     state.itemsByCategory.forEach((list) =>

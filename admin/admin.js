@@ -1,24 +1,4 @@
-import {
-  db,
-  storage,
-  auth,
-  collection,
-  doc,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  orderBy,
-  serverTimestamp,
-  ref,
-  uploadBytesResumable,
-  getDownloadURL,
-  deleteObject,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-} from "../js/firebase-init.js";
+import { supabase } from "../js/supabase-init.js";
 
 /* ---------------------------------------------------------------------- */
 /* Element refs                                                            */
@@ -82,28 +62,43 @@ function setButtonLoading(btn, isLoading, loadingLabel, defaultLabel) {
   btn.textContent = isLoading ? loadingLabel : defaultLabel;
 }
 
-/** Uploads a file to Storage with a progress callback, returns the download URL. */
-function uploadImage(file, path, onProgress) {
-  return new Promise((resolve, reject) => {
-    const storageRef = ref(storage, path);
-    const task = uploadBytesResumable(storageRef, file);
-    task.on(
-      "state_changed",
-      (snapshot) => {
-        const pct = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        onProgress?.(pct);
-      },
-      (error) => reject(error),
-      async () => {
-        try {
-          const url = await getDownloadURL(task.snapshot.ref);
-          resolve(url);
-        } catch (err) {
-          reject(err);
-        }
-      }
-    );
+/**
+ * Uploads a file to a Supabase Storage bucket and returns both its public
+ * URL and its storage path (the path is kept in the DB row so we can delete
+ * the file later without having to parse it back out of the URL).
+ */
+async function uploadImage(bucket, file, progressEl) {
+  const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
+
+  if (progressEl) {
+    progressEl.style.display = "block";
+    progressEl.querySelector(".progress-bar-fill").style.width = "40%";
+  }
+
+  const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, {
+    cacheControl: "3600",
+    upsert: false,
   });
+
+  if (uploadError) throw uploadError;
+
+  if (progressEl) {
+    progressEl.querySelector(".progress-bar-fill").style.width = "100%";
+  }
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return { url: data.publicUrl, path };
+}
+
+/** Deletes a Storage object but never blocks the calling flow if it's already gone. */
+async function deleteImageSafely(bucket, path) {
+  if (!path) return;
+  try {
+    const { error } = await supabase.storage.from(bucket).remove([path]);
+    if (error) console.warn("Could not delete image (may already be removed):", error);
+  } catch (err) {
+    console.warn("Could not delete image (may already be removed):", err);
+  }
 }
 
 function validateImageFile(file) {
@@ -122,17 +117,30 @@ function validateImageFile(file) {
 /* Auth                                                                     */
 /* ---------------------------------------------------------------------- */
 
-onAuthStateChanged(auth, (user) => {
-  if (user) {
+async function checkSession() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  applyAuthState(session);
+}
+
+function applyAuthState(session) {
+  if (session?.user) {
     loginWrap.hidden = true;
     dashboard.hidden = false;
-    adminEmailLabel.textContent = user.email || "";
+    adminEmailLabel.textContent = session.user.email || "";
     loadAll();
   } else {
     loginWrap.hidden = false;
     dashboard.hidden = true;
   }
+}
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  applyAuthState(session);
 });
+
+checkSession();
 
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -143,7 +151,8 @@ loginForm.addEventListener("submit", async (e) => {
 
   setButtonLoading(submitBtn, true, "Signing in…", "Sign in");
   try {
-    await signInWithEmailAndPassword(auth, email, password);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
   } catch (err) {
     console.error(err);
     loginError.textContent = "Couldn't sign in. Check the email and password and try again.";
@@ -152,7 +161,7 @@ loginForm.addEventListener("submit", async (e) => {
   }
 });
 
-logoutBtn.addEventListener("click", () => signOut(auth));
+logoutBtn.addEventListener("click", () => supabase.auth.signOut());
 
 /* ---------------------------------------------------------------------- */
 /* Load categories + items                                                 */
@@ -160,12 +169,16 @@ logoutBtn.addEventListener("click", () => signOut(auth));
 
 async function loadAll() {
   try {
-    const categoriesQuery = query(collection(db, "categories"), orderBy("order", "asc"));
-    const categoriesSnap = await getDocs(categoriesQuery);
-    state.categories = categoriesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const { data: categories, error: categoriesError } = await supabase
+      .from("categories")
+      .select("*")
+      .order("order", { ascending: true });
+    if (categoriesError) throw categoriesError;
+    state.categories = categories || [];
 
-    const itemsSnap = await getDocs(collection(db, "items"));
-    state.items = itemsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const { data: items, error: itemsError } = await supabase.from("items").select("*");
+    if (itemsError) throw itemsError;
+    state.items = items || [];
 
     renderCategoryList();
     renderCategorySelect();
@@ -211,24 +224,23 @@ categoryForm.addEventListener("submit", async (e) => {
   }
 
   setButtonLoading(categorySubmitBtn, true, "Adding…", "Add category");
-  categoryUploadProgress.style.display = "none";
 
   try {
     let logoUrl = "";
+    let logoPath = "";
     if (pendingCategoryFile) {
-      categoryUploadProgress.style.display = "block";
-      const path = `category-logos/${Date.now()}-${pendingCategoryFile.name}`;
-      logoUrl = await uploadImage(pendingCategoryFile, path, (pct) => {
-        categoryUploadProgress.querySelector(".progress-bar-fill").style.width = `${pct}%`;
-      });
+      const uploaded = await uploadImage("category-logos", pendingCategoryFile, categoryUploadProgress);
+      logoUrl = uploaded.url;
+      logoPath = uploaded.path;
     }
 
-    await addDoc(collection(db, "categories"), {
+    const { error } = await supabase.from("categories").insert({
       name,
-      logoUrl,
+      logo_url: logoUrl,
+      logo_path: logoPath,
       order: state.categories.length,
-      createdAt: serverTimestamp(),
     });
+    if (error) throw error;
 
     categoryForm.reset();
     categoryLogoPreview.hidden = true;
@@ -254,9 +266,9 @@ function renderCategoryList() {
 
   categoryList.innerHTML = state.categories
     .map((cat) => {
-      const itemCount = state.items.filter((i) => i.categoryId === cat.id).length;
-      const imgHtml = cat.logoUrl
-        ? `<img src="${escapeHtml(cat.logoUrl)}" alt="" onerror="this.outerHTML='<div class=\\'img-fallback\\'>—</div>'" />`
+      const itemCount = state.items.filter((i) => i.category_id === cat.id).length;
+      const imgHtml = cat.logo_url
+        ? `<img src="${escapeHtml(cat.logo_url)}" alt="" onerror="this.outerHTML='<div class=\\'img-fallback\\'>—</div>'" />`
         : `<div class="img-fallback">—</div>`;
       return `
         <div class="admin-row" data-id="${cat.id}">
@@ -278,24 +290,28 @@ categoryList.addEventListener("click", async (e) => {
   if (!btn) return;
   const id = btn.dataset.id;
   const cat = state.categories.find((c) => c.id === id);
-  const itemCount = state.items.filter((i) => i.categoryId === id).length;
+  const itemsInCategory = state.items.filter((i) => i.category_id === id);
 
-  const confirmMsg = itemCount
-    ? `Delete "${cat?.name}" and its ${itemCount} item${itemCount === 1 ? "" : "s"}? This can't be undone.`
+  const confirmMsg = itemsInCategory.length
+    ? `Delete "${cat?.name}" and its ${itemsInCategory.length} item${itemsInCategory.length === 1 ? "" : "s"}? This can't be undone.`
     : `Delete "${cat?.name}"? This can't be undone.`;
   if (!window.confirm(confirmMsg)) return;
 
   btn.disabled = true;
   try {
-    // Delete items in this category first (and their images), then the category.
-    const itemsToDelete = state.items.filter((i) => i.categoryId === id);
-    for (const item of itemsToDelete) {
-      await deleteItemRecord(item);
+    // Delete each item's image from Storage first (their DB rows will cascade-
+    // delete automatically when the category row is removed, via the foreign
+    // key ON DELETE CASCADE set up in schema.sql).
+    for (const item of itemsInCategory) {
+      await deleteImageSafely("menu-items", item.image_path);
     }
-    if (cat?.logoUrl) {
-      await deleteImageSafely(cat.logoUrl);
+    if (cat?.logo_path) {
+      await deleteImageSafely("category-logos", cat.logo_path);
     }
-    await deleteDoc(doc(db, "categories", id));
+
+    const { error } = await supabase.from("categories").delete().eq("id", id);
+    if (error) throw error;
+
     showToast("Category deleted.");
     await loadAll();
   } catch (err) {
@@ -360,26 +376,25 @@ itemForm.addEventListener("submit", async (e) => {
   }
 
   setButtonLoading(itemSubmitBtn, true, "Adding…", "Add item");
-  itemUploadProgress.style.display = "none";
 
   try {
     let imageUrl = "";
+    let imagePath = "";
     if (pendingItemFile) {
-      itemUploadProgress.style.display = "block";
-      const path = `menu-items/${Date.now()}-${pendingItemFile.name}`;
-      imageUrl = await uploadImage(pendingItemFile, path, (pct) => {
-        itemUploadProgress.querySelector(".progress-bar-fill").style.width = `${pct}%`;
-      });
+      const uploaded = await uploadImage("menu-items", pendingItemFile, itemUploadProgress);
+      imageUrl = uploaded.url;
+      imagePath = uploaded.path;
     }
 
-    await addDoc(collection(db, "items"), {
+    const { error } = await supabase.from("items").insert({
       name,
       price,
       description,
-      imageUrl,
-      categoryId,
-      createdAt: serverTimestamp(),
+      image_url: imageUrl,
+      image_path: imagePath,
+      category_id: categoryId,
     });
+    if (error) throw error;
 
     itemForm.reset();
     itemImagePreview.hidden = true;
@@ -404,13 +419,13 @@ function renderItemList() {
   }
 
   const byCategoryName = (item) =>
-    state.categories.find((c) => c.id === item.categoryId)?.name || "Uncategorised";
+    state.categories.find((c) => c.id === item.category_id)?.name || "Uncategorised";
 
   itemList.innerHTML = [...state.items]
     .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
     .map((item) => {
-      const imgHtml = item.imageUrl
-        ? `<img src="${escapeHtml(item.imageUrl)}" alt="" onerror="this.outerHTML='<div class=\\'img-fallback\\'>—</div>'" />`
+      const imgHtml = item.image_url
+        ? `<img src="${escapeHtml(item.image_url)}" alt="" onerror="this.outerHTML='<div class=\\'img-fallback\\'>—</div>'" />`
         : `<div class="img-fallback">—</div>`;
       return `
         <div class="admin-row" data-id="${item.id}">
@@ -436,7 +451,10 @@ itemList.addEventListener("click", async (e) => {
 
   btn.disabled = true;
   try {
-    await deleteItemRecord(item);
+    await deleteImageSafely("menu-items", item.image_path);
+    const { error } = await supabase.from("items").delete().eq("id", id);
+    if (error) throw error;
+
     showToast("Item deleted.");
     await loadAll();
   } catch (err) {
@@ -446,20 +464,3 @@ itemList.addEventListener("click", async (e) => {
     btn.disabled = false;
   }
 });
-
-async function deleteItemRecord(item) {
-  if (item.imageUrl) {
-    await deleteImageSafely(item.imageUrl);
-  }
-  await deleteDoc(doc(db, "items", item.id));
-}
-
-/** Deletes a Storage image but never blocks the calling flow if it's already gone. */
-async function deleteImageSafely(url) {
-  try {
-    const storageRef = ref(storage, url);
-    await deleteObject(storageRef);
-  } catch (err) {
-    console.warn("Could not delete image (may already be removed):", err);
-  }
-}

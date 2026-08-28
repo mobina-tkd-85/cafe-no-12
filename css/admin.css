@@ -1,9 +1,11 @@
 /* Admin panel — reuses tokens from styles.css, adds dashboard/form patterns */
 
+/* The [hidden] attribute must always win over any class's own "display"
+   rule (e.g. .login-wrap sets display:flex), otherwise toggling
+   element.hidden = true/false in JS has no visible effect. */
 [hidden] {
   display: none !important;
 }
-
 
 body.admin-body {
   background: var(--forest-soft);
@@ -54,13 +56,8 @@ body.admin-body {
   transition: opacity 0.15s ease, transform 0.1s ease;
 }
 
-.btn:hover {
-  opacity: 0.9;
-}
-
-.btn:active {
-  transform: scale(0.98);
-}
+.btn:hover { opacity: 0.9; }
+.btn:active { transform: scale(0.98); }
 
 .btn.btn-outline {
   background: transparent;
@@ -184,10 +181,7 @@ select {
   color: var(--ink);
 }
 
-textarea {
-  resize: vertical;
-  min-height: 70px;
-}
+textarea { resize: vertical; min-height: 70px; }
 
 input[type="file"] {
   width: 100%;
@@ -200,14 +194,10 @@ input[type="file"] {
   gap: 0 16px;
 }
 
-.form-grid .field.full {
-  grid-column: 1 / -1;
-}
+.form-grid .field.full { grid-column: 1 / -1; }
 
 @media (max-width: 600px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
+  .form-grid { grid-template-columns: 1fr; }
 }
 
 .image-preview {
@@ -290,15 +280,8 @@ input[type="file"] {
   font-size: 15px;
 }
 
-.icon-btn:hover {
-  background: var(--forest-soft);
-  color: var(--forest);
-}
-
-.icon-btn.danger:hover {
-  background: #fdf1f1;
-  color: #a13939;
-}
+.icon-btn:hover { background: var(--forest-soft); color: var(--forest); }
+.icon-btn.danger:hover { background: #fdf1f1; color: #a13939; }
 
 .error-text {
   color: #a13939;
