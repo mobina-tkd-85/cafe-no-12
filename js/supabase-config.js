@@ -11,6 +11,6 @@
 // ---------------------------------------------------------------------------
 
 export const supabaseConfig = {
-  url: "https://dzujvugheoukdkboqtdt.supabase.co/rest/v1/", // e.g. https://xxxxxxxxxxxx.supabase.co
+  url: "https://dzujvugheoukdkboqtdt.supabase.co", // e.g. https://xxxxxxxxxxxx.supabase.co
   anonKey: "sb_publishable_zIfEfODRSgwhkjRE3UEX1A_7hq7px3Z",
 };
