@@ -82,9 +82,9 @@
   }
   
   .site-logo {
-    max-height: 96px;
-    width: 96px;
-    height: 96px;
+    max-height: 105px;
+    width: 105px;
+    height: 105px;
     border-radius: 50%;
     border: 3px solid var(--forest);
     object-fit: cover;
