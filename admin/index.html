@@ -58,7 +58,7 @@
       <section class="admin-section">
         <div class="admin-section-head">
           <div>
-            <h2>Categories</h2>
+            <h2 id="category-form-heading">Add a category</h2>
             <p>These appear as the horizontal icons at the top of the menu.</p>
           </div>
         </div>
@@ -73,13 +73,17 @@
               <label for="category-logo-input">Category icon (optional)</label>
               <input type="file" id="category-logo-input" accept="image/png,image/jpeg,image/webp,image/gif" />
               <img class="image-preview" id="category-logo-preview" hidden alt="" />
+              <button type="button" id="category-remove-image-btn" hidden style="background:none;border:none;padding:0;margin-top:6px;color:var(--ink-soft);text-decoration:underline;cursor:pointer;font-size:13px;">Remove current image</button>
             </div>
           </div>
           <div class="progress-bar" id="category-upload-progress" style="display:none;">
             <div class="progress-bar-fill"></div>
           </div>
           <p class="error-text" id="category-form-error"></p>
-          <button type="submit" class="btn" id="category-submit-btn">Add category</button>
+          <div style="display:flex; gap:10px;">
+            <button type="submit" class="btn" id="category-submit-btn">Add category</button>
+            <button type="button" class="btn btn-outline" id="category-cancel-btn" hidden>Cancel</button>
+          </div>
         </form>
 
         <hr style="border:none; border-top:1px solid var(--forest-line); margin:22px 0;" />
@@ -91,7 +95,7 @@
       <section class="admin-section">
         <div class="admin-section-head">
           <div>
-            <h2>Menu items</h2>
+            <h2 id="item-form-heading">Add a menu item</h2>
             <p>Add items and assign each one to a category.</p>
           </div>
         </div>
@@ -114,6 +118,7 @@
               <label for="item-image-input">Item photo (optional)</label>
               <input type="file" id="item-image-input" accept="image/png,image/jpeg,image/webp,image/gif" />
               <img class="image-preview" id="item-image-preview" hidden alt="" />
+              <button type="button" id="item-remove-image-btn" hidden style="background:none;border:none;padding:0;margin-top:6px;color:var(--ink-soft);text-decoration:underline;cursor:pointer;font-size:13px;">Remove current image</button>
             </div>
             <div class="field full">
               <label for="item-description-input">Description (optional)</label>
@@ -124,7 +129,10 @@
             <div class="progress-bar-fill"></div>
           </div>
           <p class="error-text" id="item-form-error"></p>
-          <button type="submit" class="btn" id="item-submit-btn">Add item</button>
+          <div style="display:flex; gap:10px;">
+            <button type="submit" class="btn" id="item-submit-btn">Add item</button>
+            <button type="button" class="btn btn-outline" id="item-cancel-btn" hidden>Cancel</button>
+          </div>
         </form>
 
         <hr style="border:none; border-top:1px solid var(--forest-line); margin:22px 0;" />

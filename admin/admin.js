@@ -18,6 +18,10 @@ const categoryLogoPreview = document.getElementById("category-logo-preview");
 const categorySubmitBtn = document.getElementById("category-submit-btn");
 const categoryFormError = document.getElementById("category-form-error");
 const categoryUploadProgress = document.getElementById("category-upload-progress");
+const categoryCancelBtn = document.getElementById("category-cancel-btn");
+const categoryRemoveImageBtn = document.getElementById("category-remove-image-btn");
+const categoryFormHeading = document.getElementById("category-form-heading");
+const categoryNameInput = document.getElementById("category-name-input");
 
 const itemForm = document.getElementById("item-form");
 const itemList = document.getElementById("item-list");
@@ -27,6 +31,12 @@ const itemImagePreview = document.getElementById("item-image-preview");
 const itemSubmitBtn = document.getElementById("item-submit-btn");
 const itemFormError = document.getElementById("item-form-error");
 const itemUploadProgress = document.getElementById("item-upload-progress");
+const itemCancelBtn = document.getElementById("item-cancel-btn");
+const itemRemoveImageBtn = document.getElementById("item-remove-image-btn");
+const itemFormHeading = document.getElementById("item-form-heading");
+const itemNameInput = document.getElementById("item-name-input");
+const itemPriceInput = document.getElementById("item-price-input");
+const itemDescriptionInput = document.getElementById("item-description-input");
 
 const toast = document.getElementById("toast");
 
@@ -37,6 +47,21 @@ let state = {
 
 let pendingCategoryFile = null;
 let pendingItemFile = null;
+
+// Edit-mode state. When non-null, the corresponding form submits an UPDATE
+// instead of an INSERT.
+let editingCategoryId = null;
+let editingItemId = null;
+
+// Remembers the image already saved on the row being edited, so we know
+// what (if anything) to delete from Storage and what to keep if the user
+// doesn't pick a new file.
+let existingCategoryLogo = { url: "", path: "" };
+let existingItemImage = { url: "", path: "" };
+
+// Set when the user explicitly clicks "Remove current image" while editing.
+let removeCategoryImageFlag = false;
+let removeItemImageFlag = false;
 
 /* ---------------------------------------------------------------------- */
 /* Utilities                                                                */
@@ -198,7 +223,7 @@ categoryLogoInput.addEventListener("change", () => {
   categoryFormError.textContent = "";
   if (!file) {
     pendingCategoryFile = null;
-    categoryLogoPreview.hidden = true;
+    if (!editingCategoryId || removeCategoryImageFlag) categoryLogoPreview.hidden = true;
     return;
   }
   const err = validateImageFile(file);
@@ -209,9 +234,63 @@ categoryLogoInput.addEventListener("change", () => {
     return;
   }
   pendingCategoryFile = file;
+  removeCategoryImageFlag = false;
   categoryLogoPreview.src = URL.createObjectURL(file);
   categoryLogoPreview.hidden = false;
+  categoryRemoveImageBtn.hidden = true;
 });
+
+categoryRemoveImageBtn.addEventListener("click", () => {
+  removeCategoryImageFlag = true;
+  pendingCategoryFile = null;
+  categoryLogoInput.value = "";
+  categoryLogoPreview.hidden = true;
+  categoryRemoveImageBtn.hidden = true;
+});
+
+categoryCancelBtn.addEventListener("click", () => {
+  resetCategoryFormToAddMode();
+});
+
+function resetCategoryFormToAddMode() {
+  editingCategoryId = null;
+  existingCategoryLogo = { url: "", path: "" };
+  removeCategoryImageFlag = false;
+  pendingCategoryFile = null;
+  categoryForm.reset();
+  categoryLogoPreview.hidden = true;
+  categoryRemoveImageBtn.hidden = true;
+  categoryCancelBtn.hidden = true;
+  categoryFormError.textContent = "";
+  categoryFormHeading.textContent = "Add a category";
+  categorySubmitBtn.textContent = "Add category";
+}
+
+function startEditCategory(cat) {
+  editingCategoryId = cat.id;
+  existingCategoryLogo = { url: cat.logo_url || "", path: cat.logo_path || "" };
+  removeCategoryImageFlag = false;
+  pendingCategoryFile = null;
+  categoryLogoInput.value = "";
+  categoryFormError.textContent = "";
+
+  categoryNameInput.value = cat.name || "";
+
+  if (cat.logo_url) {
+    categoryLogoPreview.src = cat.logo_url;
+    categoryLogoPreview.hidden = false;
+    categoryRemoveImageBtn.hidden = false;
+  } else {
+    categoryLogoPreview.hidden = true;
+    categoryRemoveImageBtn.hidden = true;
+  }
+
+  categoryFormHeading.textContent = `Edit "${cat.name}"`;
+  categorySubmitBtn.textContent = "Save changes";
+  categoryCancelBtn.hidden = false;
+
+  categoryForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 categoryForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -223,36 +302,61 @@ categoryForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  setButtonLoading(categorySubmitBtn, true, "Adding…", "Add category");
+  const isEditing = Boolean(editingCategoryId);
+  const defaultLabel = isEditing ? "Save changes" : "Add category";
+  const loadingLabel = isEditing ? "Saving…" : "Adding…";
+  setButtonLoading(categorySubmitBtn, true, loadingLabel, defaultLabel);
 
   try {
-    let logoUrl = "";
-    let logoPath = "";
+    let logoUrl = isEditing ? existingCategoryLogo.url : "";
+    let logoPath = isEditing ? existingCategoryLogo.path : "";
+
     if (pendingCategoryFile) {
+      // Uploading a replacement — upload the new file first, then remove the
+      // old one so we never end up with neither if the upload fails.
       const uploaded = await uploadImage("category-logos", pendingCategoryFile, categoryUploadProgress);
+      if (isEditing && existingCategoryLogo.path) {
+        await deleteImageSafely("category-logos", existingCategoryLogo.path);
+      }
       logoUrl = uploaded.url;
       logoPath = uploaded.path;
+    } else if (isEditing && removeCategoryImageFlag) {
+      if (existingCategoryLogo.path) {
+        await deleteImageSafely("category-logos", existingCategoryLogo.path);
+      }
+      logoUrl = "";
+      logoPath = "";
     }
 
-    const { error } = await supabase.from("categories").insert({
-      name,
-      logo_url: logoUrl,
-      logo_path: logoPath,
-      order: state.categories.length,
-    });
-    if (error) throw error;
+    if (isEditing) {
+      const { error } = await supabase
+        .from("categories")
+        .update({ name, logo_url: logoUrl, logo_path: logoPath })
+        .eq("id", editingCategoryId);
+      if (error) throw error;
+      showToast("Category updated.");
+      resetCategoryFormToAddMode();
+    } else {
+      const { error } = await supabase.from("categories").insert({
+        name,
+        logo_url: logoUrl,
+        logo_path: logoPath,
+        order: state.categories.length,
+      });
+      if (error) throw error;
+      categoryForm.reset();
+      categoryLogoPreview.hidden = true;
+      pendingCategoryFile = null;
+      showToast("Category added.");
+    }
 
-    categoryForm.reset();
-    categoryLogoPreview.hidden = true;
-    pendingCategoryFile = null;
-    showToast("Category added.");
     await loadAll();
   } catch (err) {
     console.error(err);
     categoryFormError.textContent = "Something went wrong uploading or saving. Please try again.";
-    showToast("Couldn't add category.", true);
+    showToast(isEditing ? "Couldn't save category." : "Couldn't add category.", true);
   } finally {
-    setButtonLoading(categorySubmitBtn, false, "Adding…", "Add category");
+    setButtonLoading(categorySubmitBtn, false, loadingLabel, defaultLabel);
     categoryUploadProgress.style.display = "none";
     categoryUploadProgress.querySelector(".progress-bar-fill").style.width = "0%";
   }
@@ -278,6 +382,7 @@ function renderCategoryList() {
             <div class="row-meta">${itemCount} item${itemCount === 1 ? "" : "s"}</div>
           </div>
           <div class="row-actions">
+            <button class="icon-btn" title="Edit category" data-action="edit-category" data-id="${cat.id}">✎</button>
             <button class="icon-btn danger" title="Delete category" data-action="delete-category" data-id="${cat.id}">✕</button>
           </div>
         </div>`;
@@ -286,6 +391,13 @@ function renderCategoryList() {
 }
 
 categoryList.addEventListener("click", async (e) => {
+  const editBtn = e.target.closest('[data-action="edit-category"]');
+  if (editBtn) {
+    const cat = state.categories.find((c) => c.id === editBtn.dataset.id);
+    if (cat) startEditCategory(cat);
+    return;
+  }
+
   const btn = e.target.closest('[data-action="delete-category"]');
   if (!btn) return;
   const id = btn.dataset.id;
@@ -312,6 +424,7 @@ categoryList.addEventListener("click", async (e) => {
     const { error } = await supabase.from("categories").delete().eq("id", id);
     if (error) throw error;
 
+    if (editingCategoryId === id) resetCategoryFormToAddMode();
     showToast("Category deleted.");
     await loadAll();
   } catch (err) {
@@ -345,7 +458,7 @@ itemImageInput.addEventListener("change", () => {
   itemFormError.textContent = "";
   if (!file) {
     pendingItemFile = null;
-    itemImagePreview.hidden = true;
+    if (!editingItemId || removeItemImageFlag) itemImagePreview.hidden = true;
     return;
   }
   const err = validateImageFile(file);
@@ -356,9 +469,67 @@ itemImageInput.addEventListener("change", () => {
     return;
   }
   pendingItemFile = file;
+  removeItemImageFlag = false;
   itemImagePreview.src = URL.createObjectURL(file);
   itemImagePreview.hidden = false;
+  itemRemoveImageBtn.hidden = true;
 });
+
+itemRemoveImageBtn.addEventListener("click", () => {
+  removeItemImageFlag = true;
+  pendingItemFile = null;
+  itemImageInput.value = "";
+  itemImagePreview.hidden = true;
+  itemRemoveImageBtn.hidden = true;
+});
+
+itemCancelBtn.addEventListener("click", () => {
+  resetItemFormToAddMode();
+});
+
+function resetItemFormToAddMode() {
+  editingItemId = null;
+  existingItemImage = { url: "", path: "" };
+  removeItemImageFlag = false;
+  pendingItemFile = null;
+  itemForm.reset();
+  itemImagePreview.hidden = true;
+  itemRemoveImageBtn.hidden = true;
+  itemCancelBtn.hidden = true;
+  itemFormError.textContent = "";
+  itemFormHeading.textContent = "Add a menu item";
+  itemSubmitBtn.textContent = "Add item";
+  renderCategorySelect();
+}
+
+function startEditItem(item) {
+  editingItemId = item.id;
+  existingItemImage = { url: item.image_url || "", path: item.image_path || "" };
+  removeItemImageFlag = false;
+  pendingItemFile = null;
+  itemImageInput.value = "";
+  itemFormError.textContent = "";
+
+  itemNameInput.value = item.name || "";
+  itemPriceInput.value = item.price ?? "";
+  itemDescriptionInput.value = item.description || "";
+  itemCategorySelect.value = item.category_id || "";
+
+  if (item.image_url) {
+    itemImagePreview.src = item.image_url;
+    itemImagePreview.hidden = false;
+    itemRemoveImageBtn.hidden = false;
+  } else {
+    itemImagePreview.hidden = true;
+    itemRemoveImageBtn.hidden = true;
+  }
+
+  itemFormHeading.textContent = `Edit "${item.name}"`;
+  itemSubmitBtn.textContent = "Save changes";
+  itemCancelBtn.hidden = false;
+
+  itemForm.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 itemForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -375,38 +546,68 @@ itemForm.addEventListener("submit", async (e) => {
     return;
   }
 
-  setButtonLoading(itemSubmitBtn, true, "Adding…", "Add item");
+  const isEditing = Boolean(editingItemId);
+  const defaultLabel = isEditing ? "Save changes" : "Add item";
+  const loadingLabel = isEditing ? "Saving…" : "Adding…";
+  setButtonLoading(itemSubmitBtn, true, loadingLabel, defaultLabel);
 
   try {
-    let imageUrl = "";
-    let imagePath = "";
+    let imageUrl = isEditing ? existingItemImage.url : "";
+    let imagePath = isEditing ? existingItemImage.path : "";
+
     if (pendingItemFile) {
       const uploaded = await uploadImage("menu-items", pendingItemFile, itemUploadProgress);
+      if (isEditing && existingItemImage.path) {
+        await deleteImageSafely("menu-items", existingItemImage.path);
+      }
       imageUrl = uploaded.url;
       imagePath = uploaded.path;
+    } else if (isEditing && removeItemImageFlag) {
+      if (existingItemImage.path) {
+        await deleteImageSafely("menu-items", existingItemImage.path);
+      }
+      imageUrl = "";
+      imagePath = "";
     }
 
-    const { error } = await supabase.from("items").insert({
-      name,
-      price,
-      description,
-      image_url: imageUrl,
-      image_path: imagePath,
-      category_id: categoryId,
-    });
-    if (error) throw error;
+    if (isEditing) {
+      const { error } = await supabase
+        .from("items")
+        .update({
+          name,
+          price,
+          description,
+          image_url: imageUrl,
+          image_path: imagePath,
+          category_id: categoryId,
+        })
+        .eq("id", editingItemId);
+      if (error) throw error;
+      showToast("Item updated.");
+      resetItemFormToAddMode();
+    } else {
+      const { error } = await supabase.from("items").insert({
+        name,
+        price,
+        description,
+        image_url: imageUrl,
+        image_path: imagePath,
+        category_id: categoryId,
+      });
+      if (error) throw error;
+      itemForm.reset();
+      itemImagePreview.hidden = true;
+      pendingItemFile = null;
+      showToast("Item added.");
+    }
 
-    itemForm.reset();
-    itemImagePreview.hidden = true;
-    pendingItemFile = null;
-    showToast("Item added.");
     await loadAll();
   } catch (err) {
     console.error(err);
     itemFormError.textContent = "Something went wrong uploading or saving. Please try again.";
-    showToast("Couldn't add item.", true);
+    showToast(isEditing ? "Couldn't save item." : "Couldn't add item.", true);
   } finally {
-    setButtonLoading(itemSubmitBtn, false, "Adding…", "Add item");
+    setButtonLoading(itemSubmitBtn, false, loadingLabel, defaultLabel);
     itemUploadProgress.style.display = "none";
     itemUploadProgress.querySelector(".progress-bar-fill").style.width = "0%";
   }
@@ -435,6 +636,7 @@ function renderItemList() {
             <div class="row-meta">${escapeHtml(byCategoryName(item))}${item.description ? " · " + escapeHtml(item.description) : ""}</div>
           </div>
           <div class="row-actions">
+            <button class="icon-btn" title="Edit item" data-action="edit-item" data-id="${item.id}">✎</button>
             <button class="icon-btn danger" title="Delete item" data-action="delete-item" data-id="${item.id}">✕</button>
           </div>
         </div>`;
@@ -443,6 +645,13 @@ function renderItemList() {
 }
 
 itemList.addEventListener("click", async (e) => {
+  const editBtn = e.target.closest('[data-action="edit-item"]');
+  if (editBtn) {
+    const item = state.items.find((i) => i.id === editBtn.dataset.id);
+    if (item) startEditItem(item);
+    return;
+  }
+
   const btn = e.target.closest('[data-action="delete-item"]');
   if (!btn) return;
   const id = btn.dataset.id;
@@ -455,6 +664,7 @@ itemList.addEventListener("click", async (e) => {
     const { error } = await supabase.from("items").delete().eq("id", id);
     if (error) throw error;
 
+    if (editingItemId === id) resetItemFormToAddMode();
     showToast("Item deleted.");
     await loadAll();
   } catch (err) {
